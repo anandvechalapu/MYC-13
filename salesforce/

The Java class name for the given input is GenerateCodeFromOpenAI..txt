@@ -1,0 +1,38 @@
+
+
+Trigger:
+
+Trigger GenerateCodeFromOpenAI on Salesforce_Object__c (before insert, before update) {
+    // Create a list to store the generated codes
+    List<String> generatedCodes = new List<String>();
+    
+    // Iterate through the records passed to the trigger
+    for (Salesforce_Object__c obj : Trigger.new) {
+        // Set the flag to false to indicate the code generation process has not started
+        obj.Code_Generated__c = false;
+        
+        // Call the OpenAI service to generate the code
+        generatedCodes.add(OpenAI.generateCode(obj.UserStory__c, obj.Project_Details__c));
+    }
+    
+    // Create a request in the database to track the status of the code generation process
+    Database.createRequest(generatedCodes);
+    
+    // Wait for the response from OpenAI indicating whether the code generation was successful or not
+    List<String> resultCodes = OpenAI.waitForResult(generatedCodes);
+    
+    // Iterate through the records passed to the trigger
+    for (Salesforce_Object__c obj : Trigger.new) {
+        // Set the flag to true to indicate the code generation process was successful 
+        obj.Code_Generated__c = true;
+        
+        // Get the generated code from the list of results
+        String generatedCode = resultCodes.get(generatedCodes.indexOf(obj.UserStory__c));
+        
+        // Display the generated code to the user in a readable format
+        obj.Generated_Code__c = generatedCode;
+        
+        // Store the generated code in the database along with the GitHub link information
+        Database.storeGeneratedCode(obj.UserStory__c, generatedCode, obj.GitHub_Link__c);
+    }
+}
